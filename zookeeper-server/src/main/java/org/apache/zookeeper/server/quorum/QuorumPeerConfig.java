@@ -58,6 +58,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
+/**
+ * 配置文件类
+ */
 @InterfaceAudience.Public
 public class QuorumPeerConfig {
 
@@ -270,6 +273,7 @@ public class QuorumPeerConfig {
     }
 
     /**
+     * 循环遍历解析配置文件中的配置
      * Parse config from a Properties.
      * @param zkProp Properties to parse from.
      * @throws IOException

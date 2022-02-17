@@ -124,6 +124,7 @@ public class QuorumPeerMain {
             config.parse(args[0]);
         }
 
+        //启动一个定时任务，清理旧数据并生成快照
         // Start and schedule the the purge task
         DatadirCleanupManager purgeMgr = new DatadirCleanupManager(
             config.getDataDir(),
@@ -132,6 +133,7 @@ public class QuorumPeerMain {
             config.getPurgeInterval());
         purgeMgr.start();
 
+        // 如果配置文件没有问题，集群模式启动，都是就用单机模式启动
         if (args.length == 1 && config.isDistributed()) {
             runFromConfig(config);
         } else {
@@ -172,6 +174,7 @@ public class QuorumPeerMain {
                 secureCnxnFactory.configure(config.getSecureClientPortAddress(), config.getMaxClientCnxns(), config.getClientPortListenBacklog(), true);
             }
 
+            //创建QuorumPeer实例，封装了选举，zab一致性算法中的内容
             quorumPeer = getQuorumPeer();
             quorumPeer.setTxnFactory(new FileTxnSnapLog(config.getDataLogDir(), config.getDataDir()));
             quorumPeer.enableLocalSessions(config.areLocalSessionsEnabled());
@@ -223,7 +226,7 @@ public class QuorumPeerMain {
             if (config.jvmPauseMonitorToRun) {
                 quorumPeer.setJvmPauseMonitor(new JvmPauseMonitor(config));
             }
-
+            // 这里是重点
             quorumPeer.start();
             ZKAuditProvider.addZKStartStopAuditLog();
             quorumPeer.join();

@@ -193,6 +193,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     private static final long superSecret = 0XB3415C00L;
 
     private final AtomicInteger requestsInProcess = new AtomicInteger(0);
+    // 保存的是正在被处理的事务，是要对内存中的DataTree做的改变，后面的记录在读取数据的时候，先到这里读取，作用就是，在保证顺序的前提下，不必等前面的事务处理完成才可以处理后面的事务，提高了效率
     final Deque<ChangeRecord> outstandingChanges = new ArrayDeque<>();
     // this data structure must be accessed under the outstandingChanges lock
     final Map<String, ChangeRecord> outstandingChangesForPath = new HashMap<String, ChangeRecord>();
@@ -1697,7 +1698,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         processTxnForSessionEvents(null, hdr, txn);
         return processTxnInDB(hdr, txn, null);
     }
-
+    // 应用事务记录
     // entry point for FinalRequestProcessor.java
     public ProcessTxnResult processTxn(Request request) {
         TxnHeader hdr = request.getHdr();
@@ -1706,6 +1707,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         final boolean writeRequest = (hdr != null);
         final boolean quorumRequest = request.isQuorum();
 
+        // 读请求，直接返回
         // return fast w/o synchronization when we get a read
         if (!writeRequest && !quorumRequest) {
             return new ProcessTxnResult();

@@ -195,7 +195,7 @@ public class WorkerService {
         }
 
     }
-
+    // 工作线程使用的是 固定线程池，线程数=CPU核心数*2
     public void start() {
         if (numWorkerThreads > 0) {
             if (threadsAreAssignable) {

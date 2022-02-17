@@ -363,8 +363,10 @@ public class FinalRequestProcessor implements RequestProcessor {
             case OpCode.getData: {
                 lastOp = "GETD";
                 GetDataRequest getDataRequest = new GetDataRequest();
+                //反序列化
                 ByteBufferInputStream.byteBuffer2Record(request.request, getDataRequest);
                 path = getDataRequest.getPath();
+                //读取数据
                 rsp = handleGetDataRequest(getDataRequest, cnxn, request.authInfo);
                 requestPathMetricsCollector.registerRequest(request.type, path);
                 break;

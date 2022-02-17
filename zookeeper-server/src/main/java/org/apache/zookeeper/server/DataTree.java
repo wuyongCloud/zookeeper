@@ -950,6 +950,7 @@ public class DataTree {
                 break;
             case OpCode.reconfig:
             case OpCode.setData:
+                // 实际更新Znode
                 SetDataTxn setDataTxn = (SetDataTxn) txn;
                 rc.path = setDataTxn.getPath();
                 rc.stat = setData(

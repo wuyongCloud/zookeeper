@@ -69,6 +69,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
     private int randRoll;
     private long randSize;
 
+    //需要被处理的request 队列
     private final BlockingQueue<Request> queuedRequests = new LinkedBlockingQueue<Request>();
 
     private final Semaphore snapThreadMutex = new Semaphore(1);
@@ -81,6 +82,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
      * Transactions that have been written and are waiting to be flushed to
      * disk. Basically this is the list of SyncItems whose callbacks will be
      * invoked after flush returns successfully.
+     * 已经被写入事务日志，但还没有flush磁盘的request
      */
     private final Queue<Request> toFlush;
     private long lastFlushTime;
@@ -152,11 +154,15 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
         randSize = Math.abs(ThreadLocalRandom.current().nextLong() % (snapSizeInBytes / 2));
     }
 
+    /**
+     * 当前类主要是将事务请求应用到事务日志中，另外在这过程中，在合适的时候对当前内存数据做快照
+     */
     @Override
     public void run() {
         try {
             // we do this in an attempt to ensure that not all of the servers
             // in the ensemble take a snapshot at the same time
+            // 确保所有的节点不会在同一时间做快照
             resetSnapshotStats();
             lastFlushTime = Time.currentElapsedTime();
             while (true) {
@@ -165,28 +171,31 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                 long pollTime = Math.min(zks.getMaxWriteQueuePollTime(), getRemainingDelay());
                 Request si = queuedRequests.poll(pollTime, TimeUnit.MILLISECONDS);
                 if (si == null) {
+                    // 没有要处理的request,调用flush方法
                     /* We timed out looking for more writes to batch, go ahead and flush immediately */
                     flush();
                     si = queuedRequests.take();
                 }
-
+                //如果si是一个poison pill, 则退出循环
                 if (si == REQUEST_OF_DEATH) {
                     break;
                 }
 
                 long startProcessTime = Time.currentElapsedTime();
                 ServerMetrics.getMetrics().SYNC_PROCESSOR_QUEUE_TIME.add(startProcessTime - si.syncQueueStartTime);
-
+                // 读请求不会做什么，将请求应用到DataTree上
                 // track the number of records written to the log
                 if (zks.getZKDatabase().append(si)) {
+                    // 判断是否应该做快照
                     if (shouldSnapshot()) {
                         resetSnapshotStats();
-                        // roll the log
+                        // roll the log 滚动事务日志
                         zks.getZKDatabase().rollLog();
-                        // take a snapshot
+                        // take a snapshot 尝试去做快照
                         if (!snapThreadMutex.tryAcquire()) {
                             LOG.warn("Too busy to snap, skipping");
                         } else {
+                            //启动一个线程，做快照
                             new ZooKeeperThread("Snapshot Thread") {
                                 public void run() {
                                     try {
@@ -205,6 +214,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                     // iff this is a read, and there are no pending
                     // flushes (writes), then just pass this to the next
                     // processor
+                    // 如果是一个读取(不是事务请求)，并且没有pending的flushes操作，就直接交给下一个处理器
                     if (nextProcessor != null) {
                         nextProcessor.processRequest(si);
                         if (nextProcessor instanceof Flushable) {

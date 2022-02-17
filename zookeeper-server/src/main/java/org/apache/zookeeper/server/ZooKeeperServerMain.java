@@ -104,11 +104,12 @@ public class ZooKeeperServerMain {
 
         ServerConfig config = new ServerConfig();
         if (args.length == 1) {
+            // 解析zoo.config 配置文件
             config.parse(args[0]);
         } else {
             config.parse(args);
         }
-
+        // 从配置文件处开始启动调试
         runFromConfig(config);
     }
 
@@ -143,7 +144,7 @@ public class ZooKeeperServerMain {
             txnLog.setServerStats(zkServer.serverStats());
 
             // Registers shutdown handler which will be used to know the
-            // server error or shutdown state changes.
+            // server error or shutdown state changes. 注册shutDown 拦截器
             final CountDownLatch shutdownLatch = new CountDownLatch(1);
             zkServer.registerServerShutdownHandler(new ZooKeeperServerShutdownHandler(shutdownLatch));
 
@@ -178,6 +179,7 @@ public class ZooKeeperServerMain {
 
             // Watch status of ZooKeeper server. It will do a graceful shutdown
             // if the server is not running or hits an internal error.
+            // 阻塞在这，除非ZooKeeperServerShutdownHandler 捕捉了异常，调用countDownLatch 执行关闭流程
             shutdownLatch.await();
 
             shutdown();

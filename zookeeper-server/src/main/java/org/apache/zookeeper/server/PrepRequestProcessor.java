@@ -385,13 +385,16 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements Req
         case OpCode.setData:
             zks.sessionTracker.checkSession(request.sessionId, request.getOwner());
             SetDataRequest setDataRequest = (SetDataRequest) record;
+            // 反序列化
             if (deserialize) {
                 ByteBufferInputStream.byteBuffer2Record(request.request, setDataRequest);
             }
             path = setDataRequest.getPath();
             validatePath(path, request.sessionId);
+            // 从outstandingChanges 获取之前被修改了的，但还有被应用的数据，主要是为了提高吞吐和效率，后一个更新操作，不必要等到前一个完全做完才能执行
             nodeRecord = getRecordForPath(path);
             zks.checkACL(request.cnxn, nodeRecord.acl, ZooDefs.Perms.WRITE, request.authInfo, path, null);
+            //应用数据，幂等，变化的是version
             int newVersion = checkAndIncVersion(nodeRecord.stat.getVersion(), setDataRequest.getVersion(), path);
             request.setTxn(new SetDataTxn(path, setDataRequest.getData(), newVersion));
             nodeRecord = nodeRecord.duplicate(request.getHdr().getZxid());
@@ -645,6 +648,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements Req
         }
     }
 
+    // create 创建事务记录
     private void pRequest2TxnCreate(int type, Request request, Record record, boolean deserialize) throws IOException, KeeperException {
         if (deserialize) {
             ByteBufferInputStream.byteBuffer2Record(request.request, record);
@@ -684,6 +688,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements Req
         }
         validatePath(path, request.sessionId);
         try {
+            //获取父节点，先去
             if (getRecordForPath(path) != null) {
                 throw new KeeperException.NodeExistsException(path);
             }

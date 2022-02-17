@@ -734,6 +734,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory {
     public void start() {
         stopped = false;
         if (workerPool == null) {
+            //工作线程 CPU内核数量*2
             workerPool = new WorkerService("NIOWorker", numWorkerThreads, false);
         }
         for (SelectorThread thread : selectorThreads) {

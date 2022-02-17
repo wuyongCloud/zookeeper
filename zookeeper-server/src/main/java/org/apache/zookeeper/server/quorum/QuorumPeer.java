@@ -1067,6 +1067,10 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         return quorumStats;
     }
 
+    /**
+     * 通过快照和事务日志，恢复宕机之前的数据
+     * 启动 NIOServerCnxnFactory
+     */
     @Override
     public synchronized void start() {
         if (!getView().containsKey(myid)) {
@@ -1080,7 +1084,9 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             LOG.warn("Problem starting AdminServer", e);
             System.out.println(e);
         }
+        // 开始leader选举，
         startLeaderElection();
+        // 启动一个jvm的监控
         startJvmPauseMonitor();
         super.start();
     }
@@ -1088,7 +1094,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     private void loadDataBase() {
         try {
             zkDb.loadDataBase();
-
+            // 获取DataTree last zxid 获取高32位epoch
             // load the epochs
             long lastProcessedZxid = zkDb.getDataTree().lastProcessedZxid;
             long epochOfZxid = ZxidUtils.getEpochFromZxid(lastProcessedZxid);
@@ -1328,6 +1334,10 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
 
     boolean shuttingDownLE = false;
 
+    /**
+     * 内部是一个死循环，不断的检测各种状态做不同的事。
+     * 当节点处于LOOKING状态时，会启动的一个readOnlyServer
+     */
     @Override
     public void run() {
         updateThreadName();
